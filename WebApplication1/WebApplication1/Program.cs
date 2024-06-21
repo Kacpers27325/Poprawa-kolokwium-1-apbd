@@ -10,7 +10,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 
 
-builder.Services.AddScoped<IBookRepository, BookRepository>();
+builder.Services.AddScoped<IAnimalsRepository,AnimalsRepository>();
 
 var app = builder.Build();
 
