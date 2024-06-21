@@ -3,7 +3,7 @@ using WebApplication1.DTOs;
 using WebApplication1.Repositories;
 namespace WebApplication1.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/animals")]
     [ApiController]
     public class AnimalsController : ControllerBase
     {
