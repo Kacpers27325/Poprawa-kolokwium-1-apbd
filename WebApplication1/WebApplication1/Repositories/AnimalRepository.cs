@@ -45,6 +45,11 @@ namespace WebApplication1.Repositories
         
 public async Task<AnimalDto> GetAnimal(int id)
 {
+    if (!await DoesAnimalExist(id))
+    {
+        throw new Exception("Animal not found.");
+    }
+ 
     var query = @"
         SELECT 
             Animal.ID AS AnimalID,
@@ -62,70 +67,75 @@ public async Task<AnimalDto> GetAnimal(int id)
         LEFT JOIN [Procedure] ON [Procedure].ID = Procedure_Animal.ProcedureID
         WHERE Animal.ID = @ID";
  
-    await using var connection = new SqlConnection(_configuration.GetConnectionString("Default"));
-    await using var command = new SqlCommand(query, connection);
-    command.Parameters.AddWithValue("@ID", id);
-    await connection.OpenAsync();
-    var reader = await command.ExecuteReaderAsync();
- 
-    if (!reader.HasRows)
-    {
-        throw new Exception("Animal not found.");
-    }
- 
-    var animalIdOrdinal = reader.GetOrdinal("AnimalID");
-    var animalNameOrdinal = reader.GetOrdinal("AnimalName");
-    var admissionDateOrdinal = reader.GetOrdinal("AdmissionDate");
-    var ownerIdOrdinal = reader.GetOrdinal("OwnerID");
-    var firstNameOrdinal = reader.GetOrdinal("FirstName");
-    var lastNameOrdinal = reader.GetOrdinal("LastName");
-    var dateOrdinal = reader.GetOrdinal("Date");
-    var procedureNameOrdinal = reader.GetOrdinal("ProcedureName");
-    var procedureDescriptionOrdinal = reader.GetOrdinal("Description");
- 
     AnimalDto animalDto = null;
  
-    while (await reader.ReadAsync())
+    await using (var connection = new SqlConnection(_configuration.GetConnectionString("Default")))
     {
-        if (animalDto != null)
+        await using (var command = new SqlCommand(query, connection))
         {
-            if (!reader.IsDBNull(dateOrdinal)) 
+            command.Parameters.AddWithValue("@ID", id);
+            await connection.OpenAsync();
+ 
+            var reader = await command.ExecuteReaderAsync();
+ 
+            if (!reader.HasRows)
             {
-                animalDto.Procedures.Add(new ProcedureDto()
-                {
-                    Date = reader.GetDateTime(dateOrdinal),
-                    Name = reader.GetString(procedureNameOrdinal),
-                    Description = reader.GetString(procedureDescriptionOrdinal)
-                });
+                throw new Exception("Animal data not found.");
             }
-        }
-        else
-        {
-            animalDto = new AnimalDto()
+ 
+            var animalIdOrdinal = reader.GetOrdinal("AnimalID");
+            var animalNameOrdinal = reader.GetOrdinal("AnimalName");
+            var admissionDateOrdinal = reader.GetOrdinal("AdmissionDate");
+            var ownerIdOrdinal = reader.GetOrdinal("OwnerID");
+            var firstNameOrdinal = reader.GetOrdinal("FirstName");
+            var lastNameOrdinal = reader.GetOrdinal("LastName");
+            var dateOrdinal = reader.GetOrdinal("Date");
+            var procedureNameOrdinal = reader.GetOrdinal("ProcedureName");
+            var procedureDescriptionOrdinal = reader.GetOrdinal("Description");
+ 
+            while (await reader.ReadAsync())
             {
-                Id = reader.GetInt32(animalIdOrdinal),
-                Name = reader.GetString(animalNameOrdinal),
-                AdmissionDate = reader.GetDateTime(admissionDateOrdinal),
-                Owner = new OwnerDto()
+                if (animalDto == null)
                 {
-                    Id = reader.GetInt32(ownerIdOrdinal),
-                    FirstName = reader.GetString(firstNameOrdinal),
-                    LastName = reader.GetString(lastNameOrdinal),
-                },
-                Procedures = new List<ProcedureDto>()
-                {
-                    new ProcedureDto()
+                    animalDto = new AnimalDto()
                     {
-                        Date = reader.IsDBNull(dateOrdinal) ? DateTime.MinValue : reader.GetDateTime(dateOrdinal),
+                        Id = reader.GetInt32(animalIdOrdinal),
+                        Name = reader.GetString(animalNameOrdinal),
+                        AdmissionDate = await SafeGetDateTimeAsync(reader, admissionDateOrdinal),
+                        Owner = new OwnerDto()
+                        {
+                            Id = reader.GetInt32(ownerIdOrdinal),
+                            FirstName = reader.GetString(firstNameOrdinal),
+                            LastName = reader.GetString(lastNameOrdinal)
+                        },
+                        Procedures = new List<ProcedureDto>()
+                    };
+                }
+ 
+                if (!reader.IsDBNull(dateOrdinal))
+                {
+                    animalDto.Procedures.Add(new ProcedureDto()
+                    {
+                        Date = reader.GetDateTime(dateOrdinal),
                         Name = reader.GetString(procedureNameOrdinal),
                         Description = reader.GetString(procedureDescriptionOrdinal)
-                    }
+                    });
                 }
-            };
+            }
         }
+    }
+ 
+    if (animalDto == null)
+    {
+        throw new Exception("Animal data not found.");
     }
  
     return animalDto;
+}
+ 
+private async Task<DateTime> SafeGetDateTimeAsync(SqlDataReader reader, int ordinal)
+{
+    return await reader.IsDBNullAsync(ordinal) ? DateTime.MinValue : reader.GetDateTime(ordinal);
 }
         
         
