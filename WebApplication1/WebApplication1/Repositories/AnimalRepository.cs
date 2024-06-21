@@ -127,7 +127,7 @@ public async Task<AnimalDto> GetAnimal(int id)
  
     if (animalDto == null)
     {
-        throw new Exception("Animal data not found.");
+        throw new Exception("Brak zwierzaka w bazie");
     }
  
     return animalDto;
